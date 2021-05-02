@@ -3,7 +3,6 @@ v-def templ:
     XNavbar(class = 'is-dark', :fixed_top  = 'true', :menus= "menus"):
         T(v-slot:brand): XNavbarItem:img(
                 :src= "$x.URL('static/logo.png')",
-                style= 'border-radius:6px; padding:3px',
         ):
         T(v-slot:post = "{side}"):
             T(v-if = 'user'):
