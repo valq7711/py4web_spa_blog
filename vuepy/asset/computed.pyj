@@ -1,0 +1,39 @@
+noop = def(): pass;
+def computed_patch(Vue):
+    if Vue.computed: return
+
+    _vm = new Vue({computed:{value: def(): return 0;}})
+    Watcher = _vm._computedWatchers.value.constructor
+    Dep = _vm._data.__ob__.dep.__proto__.constructor
+    #_vm.$destroy()
+
+    def computed(opt, ctx):
+        ctx = ctx or _vm
+        if v"typeof opt === 'function'":
+            _get = opt
+            _set = None
+        else:
+            _get = opt.get
+            _set = opt.set
+
+        watcher = None
+        ret = {
+            def get(self):
+                nonlocal watcher
+                if not watcher:
+                    watcher = new Watcher(ctx, _get, noop, { lazy: True })
+                if watcher.dirty:
+                    watcher.evaluate()
+                if Dep.target:
+                    watcher.depend()
+                return watcher.value
+
+            def set(self, v):
+                if not _set:
+                   raise Error('Write operation failed: computed value is readonly')
+                _set(v)
+        }
+        return ret
+    computed.$destroy = def(): _vm.$destroy()
+    computed._vm = _vm
+    Vue.computed = computed

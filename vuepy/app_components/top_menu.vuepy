@@ -1,0 +1,106 @@
+v-def templ:
+    def T(%tag = 'template'):
+    XNavbar(class = 'is-dark', :fixed_top  = 'true', :menus= "menus"):
+        T(v-slot:brand): XNavbarItem:img(
+                :src= "$x.URL('static/logo.png')",
+                style= 'border-radius:6px; padding:3px',
+        ):
+        T(v-slot:post = "{side}"):
+            T(v-if = 'user'):
+                XNavbarItem(
+                    href = "to:/post"
+                ): 'Posts'
+                XNavbarItem(
+                    href = 'to:/post/new'
+                ): 'New Post'
+
+        T(v-slot:user = "{side}"):
+            T(v-if = 'user'):
+                XNavbarItem(
+                    :dropdown = "true",
+                    :side = "side"
+                ):
+                    T(v-slot:label):
+                        span:i(class = 'fa fa-user'):
+                        span(class = "is-capitalized px-1"): '{{user.username}}'
+                    T(v-slot:default):
+                        XNavbarItem(:href = "'to:/post/' + user.id"): 'My Posts'
+                        XNavbarItem(href = 'to:/profile'): 'Profile'
+                        XNavbarItem(@click = "$emit('change_password')"): 'Change Password'
+
+                XNavbarItem(@click = '$emit("logout")'):
+                    span:i(class = 'fa fa-sign-out-alt'):
+            T(v-else):
+                XNavbarItem(@click = '$emit("login")'):
+                    span(title = 'login'):i(class = 'fa fa-sign-in-alt'):
+                XNavbarItem(href = 'to:/register'):
+                    span(title = 'register'):i(class = 'fa fa-user-plus'):
+        T(v-slot:flash = "{side}"):
+            XNavbarItem(ref = 'flash', :dropdown = 'true', :side = "side"):
+                T(v-slot:label):
+                    i(class='fa fa-bullhorn fa-flip-horizontal'):
+                XNavbarItem(class = 'px-3'):
+                    div(class  = 'notification py-1', :class = "'is-'+flash_status"):
+                        T(v-if = 'flash.component'):
+                            component(:is = 'flash.component', v-bind = 'flash.cargs'):
+                        T(v-else):
+                            '{{flash.msg}}'
+        T(v-slot:progress):
+            slot(name = 'progress'):
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+vc = V_collector()
+
+@vc.component()
+class TopMenu(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            user: '/auth.user',
+            flash: 'flash'
+        }
+        self.props = {
+            menus_left: Array
+        }
+
+    def data(self):
+        ret = {menus:{}}
+        if self.menus_left:
+            ret.menus.left = self.menus_left
+        else:
+            ret.menus.left = [
+                {label:'Home', href: 'to:/index'},
+                {label:'About', href: 'to:/about'},
+                {slot:'post'},
+            ]
+        ret.menus.right = [
+            {slot:'flash'},
+            {slot:'user'},
+        ]
+        return ret
+
+    @vc.computed
+    def flash_status(self):
+        map_status = {ok: 'success', err: 'danger', error: 'danger', warn: 'warning'}
+        return map_status[self.flash.status]
+
+    @vc.watch('flash.trigger')
+    def flash_watcher(self):
+        #self.flash_active = True
+        opt = {
+            duration: 2000,
+            message: self.flash.msg,
+            status: self.flash_status,
+            component: self.flash.component,
+            props: self.flash.cargs,
+            basket: self.$refs.flash
+        }
+        self.$x.flash(opt, self)
+
+
+def make():
+    return TopMenu()
+
+}@

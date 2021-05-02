@@ -1,0 +1,273 @@
+#utils.pyj
+
+def timeout(tm):
+    def inner(f):
+        h = setTimeout(f, tm)
+        return h
+    return inner
+
+def inject_props(opt):
+    src = opt.src
+    props = opt.props
+    target = opt.target
+
+    ret = target or {}
+    opt = {}
+    src_getter = def(n):
+        return def(): return src[n];
+    isArr = Array.isArray(props)
+    for p in props:
+        getter = isArr or not (map_from = props[p]) or map_from is 'self' \
+            ? src_getter(p) \
+            : type(map_from) is 'String' ? src_getter(map_from) : map_from
+        opt[p] = {
+            configurable: False,
+            enumerable: True,
+            get: getter
+        }
+    Object.defineProperties(ret, opt)
+    return ret
+
+def to_pascal(txt):
+    single_word = True
+    def clearAndUpper(text):
+        nonlocal single_word
+        if single_word:
+            single_word = text[0] != '_'
+        return text.replace(/_/, "").toUpperCase()
+    ret = txt.replace(/((^[^_])|(_\w))/g, clearAndUpper)
+    if single_word:
+        ret = 'X'+ ret
+    return ret
+
+
+class Merge_call:
+    def set_key(self, a):
+        self.cmd = 'set_key'
+        self.args = a
+        return self
+    def merge(self, a):
+        self.cmd = 'merge'
+        self.args = a
+        return self
+
+class AsyncerError(Error):
+    def __init__(self, msg, fun):
+        super(msg)
+        self.wrapped = fun
+
+
+def asyncer(fun):
+    merge_call = {}
+    def wrap(ctx):
+        def pret(ok, err):
+            def inner(f,  opt):
+                if opt:
+                    ret_v = opt.ret_v
+                    ret_throw =  opt.ret_throw
+                    merge_key = opt.merge_key
+
+                def _err(e, merge_key):
+                    try:
+                        raise e
+                    except:
+                        err(e)
+                    if merge_key:
+                        merge_call[merge_key].map(def(cb): cb.err(e);)
+                        del merge_call[merge_key]
+
+                if ret_throw:
+                    v = ret_throw
+                else:
+                    try:
+                        if not f:
+                            f = fun.apply(ctx.self, ctx.args)
+                            if not (f and f.next):
+                                fname = fun.__name__ or fun.name or '<anonymous>'
+                                raise AsyncerError(f'${fname} must be instance of Generator', fun)
+                        v = f.next(ret_v)
+                    except as e:
+                        _err(e, merge_key)
+                        return
+                if isinstance(v.value, Merge_call):
+                    if v.value.cmd == 'get_keys':
+                        Promise.resolve(Object.keys(merge_call))
+                        .then(def(ret_v):
+                            inner(f, {ret_v, merge_key});
+                        )
+                    elif v.value.cmd == 'merge':
+                        if (p = merge_call[v.value.args]):
+                            p.push({ok: def(v): ok(v);, err: def(v): err(v);})
+                            return
+                        else:
+                            merge_key = v.value.args
+                            merge_call[merge_key] = []
+                            Promise.resolve(None).then(def(ret_v): inner(f, {ret_v, merge_key});)
+                    else:
+                        Promise.resolve(None).then(def(ret_v): inner(f, {ret_v, merge_key});)
+                elif not v.done:
+                    if isinstance(v.value, Promise):
+                        v.value.then(def(ret_v): inner(f, {ret_v, merge_key});,
+                                     def(e):
+                                         try:
+                                             v = f.throw(e)
+                                         except as e:
+                                             _err(e, merge_key)
+                                             return
+                                         inner(f, {ret_throw: v,  merge_key});
+                        )
+                    else:
+                        Promise.resolve(v.value).then(def(ret_v): inner(f, {ret_v, merge_key});)
+                else:
+                    ok(v.value)
+                    if merge_key:
+                        merge_call[merge_key].map(def(cb): cb.ok(v.value);)
+                        del merge_call[merge_key]
+            inner()
+        return pret
+    ret =  def():
+        ctx = {self:this, args: arguments}
+        p = Promise(wrap(ctx))
+        return p
+    ret.__name__ = fun.__name__ or fun.name
+    return ret
+
+
+def upload():
+    field_name = 'files'
+    def prom(ok, err):
+        el = document.createElement('input')
+        el.setAttribute('type', 'file')
+        el.setAttribute('multiple', True)
+        el.style.display = 'none'
+        document.body.appendChild(el)
+        ret = []
+        el.onchange  = def():
+            frm = new FormData()
+            done = el.files.length
+            for i in range(el.files.length):
+                frm.append(field_name, el.files[i], el.files[i].name)
+            ok(frm)
+        el.click()
+        document.body.removeChild(el)
+    return new Promise(prom)
+
+def read_img_url(file_input):
+    files = file_input.files or file_input
+    if not files[0]:
+        return Promise.resolve('')
+    raeder = new FileReader()
+    def prom(ok, err):
+        raeder.onloadend = def(): ok(raeder.result);
+        raeder.readAsDataURL(files[0])
+    return new Promise(prom)
+
+
+def upload_text():
+    def prom(ok, err):
+        el = document.createElement('input')
+        el.setAttribute('type', 'file')
+        el.setAttribute('multiple', True)
+        el.style.display = 'none'
+        document.body.appendChild(el)
+        ret = []
+        el.onchange  = def():
+            done = el.files.length
+            for i in range(el.files.length):
+                fr = new FileReader()
+                fr._filename_ =  el.files[i].name
+                fr.onloadend = def(s):
+                    nonlocal done
+                    ret.push({name : s.target._filename_, value: s.target.result})
+                    done -= 1
+                    if done == 0:
+                        ok(ret)
+                fr.readAsText(el.files[i])
+        el.click()
+        document.body.removeChild(el)
+    return new Promise(prom)
+
+
+def download_link(href, filename):
+    el = document.createElement('a')
+    el.setAttribute('href', href)
+    if filename:
+        el.setAttribute('download', filename)
+    el.style.display = 'none'
+    document.body.appendChild(el)
+    el.click()
+    document.body.removeChild(el)
+
+def download(s, filename, mime):
+    blob = new Blob([s], {type : mime or 'text/plain;charset=utf-8;'});
+    el_data = window.URL.createObjectURL(blob);
+    el = document.createElement('a')
+    el.setAttribute('href', el_data)
+    if filename:
+        el.setAttribute('download', filename)
+    el.style.display = 'none'
+    document.body.appendChild(el)
+    el.click()
+    document.body.removeChild(el)
+    window.URL.revokeObjectURL(blob)
+
+
+def SF(text, props):
+    def replacer(str_, p):
+        if (t = /^("|')(.+?)("|')$/.exec(p)):
+            return props[t[2]]
+        if (p_chain = p.split('.')) and p_chain.length > 1:
+            return p_chain.reduce(def(it, p): return it[p];, props)
+        return props[p]
+    return text.replace(/\$\{ *(.+?) *\}/g, replacer)
+
+
+def drag_track(start_event, debounce):
+    def inner(tracker):
+        inner.__name__ = tracker.__name__ or tracker.name
+        ctx = {
+            x0 : 0,
+            y0 : 0,
+            dx : 0,
+            dy : 0,
+            debounce : debounce or 50,
+            tm : None,
+            last_event: None
+        }
+        def process_move(e):
+            e = e or ctx.last_event
+            ctx.dx = e.clientX - ctx.x0
+            ctx.dy = e.clientY - ctx.y0
+            ctx.tm = False
+            tracker.call(None, 'move', e, {dx: ctx.dx, dy: ctx.dy})
+
+        def mousemove(e):
+            e.stopPropagation()
+            e.preventDefault()
+            ctx.last_event = e
+            if ctx.tm is None:
+                process_move()
+            elif not ctx.tm:
+                ctx.tm = setTimeout(process_move, ctx.debounce)
+
+        def mouseup(e):
+            document.removeEventListener( 'mousemove', mousemove)
+            document.removeEventListener( 'mouseup', mouseup)
+            e.stopPropagation()
+            e.preventDefault()
+            if ctx.tm:
+                clearTimeout(ctx.tm)
+                process_move(e)
+            tracker.call(None, 'stop' , e, {dx: ctx.dx, dy: ctx.dy})
+
+        def mousedn(e): # start listen
+            ctx.x0 = e.clientX
+            ctx.y0 = e.clientY
+            document.addEventListener( 'mousemove', mousemove, False )
+            document.addEventListener( 'mouseup', mouseup, False )
+            e.stopPropagation()
+            e.preventDefault()
+            tracker.call(None, 'start', e, {x0: ctx.x0, y0: ctx.y0})
+        mousedn(start_event)
+    return inner
+

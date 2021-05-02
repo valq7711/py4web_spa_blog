@@ -1,0 +1,106 @@
+v-def app_templ:
+    div:
+        TopMenu(
+            @login = '$router.push("/login")',
+            @logout = 'logout',
+            @change_password = 'change_password'
+        ):
+            template(v-slot:progress):
+                XProgressBar(ref = 'progress'):
+        div:
+            router-view:
+
+
+v-pyj:
+@{
+import setup
+setup.run(Vue)  #  ! run first to setup common-module
+
+from common import store, router
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+
+
+
+
+
+vc = V_collector()
+@vc.component()
+class App(RS_vue):
+    def __init__(self):
+        self.$store = store
+        self.router = router
+
+        self.template = app_templ
+        self.map_store = {
+            is_busy:  'is_busy',
+            user:  '/auth.user',
+            login:  '/auth.login*',
+            logout:  '/auth.logout*',
+            try_connect:  '/auth.try_connect*',
+            relogin_required: 'relogin_required',
+            set_relogin_required: 'relogin_required~',
+            flash: 'flash~',
+        }
+
+    def logout(self, action):
+        @self.$x.with_busy
+        @self.$x.with_progress
+        def logout():
+            return action()
+
+    @vc.watch('user')
+    def user_watch(self, n, o):
+        if not n:
+            if o: # means logout
+                window.location.reload()
+        else:
+            username = n.username[0].toLocaleUpperCase() + n.username[1:]
+            self.flash(f'Hey ${username}!', 'ok')
+
+
+    def beforeRouteLeave(self):
+        self.close_modal()
+
+
+    def change_password(self):
+        self.$x.modal('XChangePassword')
+
+    @vc.watch
+    def relogin_required(self, n, o):
+        if n:
+            self.relogin_show()
+
+    @asyncer
+    def relogin_show(self):
+        ret = (yield self.$x.modal('XLogin', {username: self.user.name}))
+        if ret == 'nav':
+            self.set_relogin_required('cancel')
+        else:
+            self.set_relogin_required(False)
+
+    def close_modal(self):
+        self.$x.modal_close('nav')
+
+    def data(self):
+        ret = {}
+        return ret
+
+    @vc.watch
+    def is_busy(self, n, o):
+        self.$x.busy(n)
+
+    def beforeCreate(self):
+        self.$x.start_progress = def(*args): return self.$refs.progress.start(*args)
+        self.$x.end_progress = def(*args): return self.$refs.progress.done(*args)
+        self.$x.$root = self
+
+    def created(self):
+        self.try_connect()
+
+def start():
+    app = App()
+    window.app = new Vue(app)
+    window.app.$mount('#app')
+
+}@

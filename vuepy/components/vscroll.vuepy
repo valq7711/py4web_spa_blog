@@ -1,0 +1,114 @@
+v-def templ:
+    div(
+        v-vscroll = "{listener:'scroll_handler', container: items_container && 'items_container', cmd: 'cmd'}",
+        style = 'height:200px;overflow-y:auto'
+    ):
+        div:
+            slot(v-bind = "{items, off}"):
+
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+
+vc = V_collector()
+
+@vc.component()
+class VScroll(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.props = {
+            get_items: Function,
+            offset: Number,
+            count: Number,
+            render_count: Number,
+            items_container: Function,
+            init_scrollto: Number,
+            distance: {type: Number, default: 20},
+        }
+
+    def data(self):
+        return {
+            top: 0,
+            bot: self.render_count,
+            off: self.offset
+        }
+        #self.cmd - set by directive
+        self.loading = None
+
+    def mounted(self):
+        if self.init_scrollto:
+            self.$nextTick(def(): self.scrollto(self.init_scrollto);)
+
+    @vc.computed
+    def items(self):
+        ret = self.get_items(self.off, self.render_count + self.distance)
+        return ret[0 : self.bot]
+
+    @vc.watch
+    def offset(self, n, prev):
+        if self.loading in ['up', 'dn']:
+            self.move_view(n-prev)
+        else:
+            self.off = n
+            if self.loading and (n = self.loading.scrollto) != undefined:
+                self.loading= None
+                self.$nextTick(def():
+                    self.cmd('scrollto', n - self.off)
+                )
+
+
+    def scrollto(self, n):
+        if self.off <= n < self.off + self.render_count:
+            self.cmd('scrollto', n)
+        else:
+            dist = self.distance
+            bot_margin = self.count - self.render_count
+            off = n-dist>= 0 ? n-dist : 0
+            off = off > bot_margin ? bot_margin : off
+            self.loading = {scrollto: n}
+            self.$emit('load_more', 'offset', off)
+
+    def move_view(self, n):
+        cb = self.cmd
+        if n == 0 : return
+        if n>0:
+            off_max = self.count - (self.off + self.render_count)
+            n = off_max + n <= self.count ? n : off_max
+            self.bot += n
+            nxt = def():
+                cb('snap')
+                self.off += n
+                self.bot -= n
+                self.$nextTick(def():
+                        cb()
+                        self.loading = None
+                )
+        else:
+            cb('snap')
+            n = -n
+            n = self.off >= n ? n : self.off
+            self.off -= n
+            self.bot += n
+            nxt = def():
+                cb()
+                self.bot -= n
+                self.loading = None
+        self.$nextTick(nxt)
+
+    def scroll_handler(self, top_bot):
+        dist = self.distance
+        if (self.off > 0 and top_bot[0] < self.distance):
+            dir = 'up'
+            dist = -dist
+        elif (self.off + self.render_count < self.count
+               and (top_bot[1] == -1 or top_bot[1] > (self.render_count - self.distance))
+        ):
+            dir = 'dn'
+        if dir and self.loading != dir :
+            self.loading = dir
+            self.$emit('load_more', dir, dist)
+
+def make():
+    return VScroll()
+}@

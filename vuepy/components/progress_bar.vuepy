@@ -1,0 +1,42 @@
+v-def templ:
+    div(class  = 'xprogress-container'):
+        div(v-if = 'active', class = 'xprogress', key = 'progress'):
+            div(ref = 'pro', :style = "style"):
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+
+vc = V_collector()
+
+@vc.component()
+class XProgressBar(RS_vue):
+    def __init__(self):
+        self.template = templ
+
+    def data(self):
+        ret = {
+            active: False,
+            style: None,
+        }
+        return ret
+
+
+    def start(self):
+        if self.active: return
+
+        self.style = None
+        self.active = True
+        self.$nextTick(def():
+            setTimeout(def():
+                    self.style = {'width': '98%'}
+            100)
+        )
+
+    def done(self):
+        if not self.active: return
+        self.style = {'width': '100%', 'transition':'width linear 0.5s'}
+        setTimeout(def(): self.active = False;, 700)
+
+def make():
+    return XProgressBar()
+}@

@@ -1,0 +1,155 @@
+from asset.rs_vue import V_collector
+from asset.store33 import RS_store
+from asset.utils import asyncer, Merge_call, timeout
+from common import http
+import common
+vc = V_collector()
+
+
+def format_err(errors):
+    ret = {}
+    for f in errors:
+        ret[f] = {
+            status: 'error',
+            message: errors[f]
+        }
+    return ret
+
+@vc.store()
+class Store:
+    def init_state(self):
+        ret = {
+            user: None,
+            profile: None,
+            logged: None,
+            http_error: None
+        }
+        return ret
+
+    def __init__(self):
+        self.inject = {
+            $flash:'$flash',
+            $toggle_busy: '$toggle_busy'
+        }
+
+        self.LOGIN = 'auth/api/login'
+        self.LOGOUT = 'auth/api/logout'
+        self.REGISTER = 'auth/api/register'
+        self.CHANGE_PASSWORD = 'auth/api/change_password'
+        self.TRY_CONNECT = 'try_connect'
+        self.PROFILE = 'api_blog/profile'
+
+
+    @vc.mutation
+    def clear_error(self):
+        self.commit('http_error=', None)
+
+    @vc.mutation
+    def profile(self, data):
+        data = data.profile
+        if data.image:
+            data.image = common.URL(f'static/images/${data.image}')
+        self.state.profile = data
+
+    @vc.action
+    @asyncer
+    def profile_get(self):
+        try:
+            resp = (yield http.get(self.PROFILE)).data
+        except as err:
+            self.commit('http_error=', {status: err.response.status, data: err.response.data})
+            httperr = Error()
+            httperr.http = err.response.data
+            raise httperr
+        self.commit('profile', resp)
+        return True
+
+    @vc.action
+    @asyncer
+    def profile_set(self, data):
+        if not isinstance(data, FormData):
+            frm = new FormData()
+            for k in data:
+                v = data[k]
+                if isinstance(v, FileList):
+                    v = v[0]
+                frm.append(k, v)
+        try:
+            resp = (yield http.put(self.PROFILE, frm)).data
+        except as err:
+            self.commit('http_error=', {status: err.response.status, data: err.response.data})
+            httperr = Error()
+            httperr.errors = format_err(err.response.data.errors)
+            raise httperr
+        self.commit('profile', resp)
+
+
+    @vc.action
+    @asyncer
+    def register(self, data):
+        if isinstance(data, FormData):
+            data = Object.fromEntries(data)
+        try:
+            resp = (yield http.post(self.REGISTER, data)).data
+        except as err:
+            self.commit('http_error=', {status: err.response.status, data: err.response.data})
+            httperr = Error()
+            httperr.errors =  format_err(err.response.data.errors)
+            raise httperr
+        return True
+
+
+    @vc.action
+    @asyncer
+    def try_connect(self):
+        yield Merge_call().merge(1)
+        logged = self.state.logged
+        if logged or logged == False:
+            return
+        try:
+            user = (yield http.get(self.TRY_CONNECT)).data.user
+        except as err:
+            if err.response:
+                self.commit('http_error=', {status: err.response.status, data: err.response.data})
+                self.commit('logged=', False)
+                return
+            else:
+                raise err
+        self.commit('user=', user)
+        self.commit('logged=', True)
+        return True
+
+    @vc.action
+    @asyncer
+    def login(self, data):
+        if isinstance(data, FormData):
+            data = Object.fromEntries(data)
+        if not data.email:
+            data.email = data.username
+        try:
+            user = (yield http.post(self.LOGIN, data)).data.user
+            self.commit('user=', user)
+            self.commit('logged=', True)
+        except as err:
+            self.commit('http_error=', {status: err.response.status, data: err.response.data})
+
+    @vc.action
+    @asyncer
+    def logout(self):
+        try:
+            yield http.post(self.LOGOUT)
+            self.commit('user=', None)
+            self.commit('logged=', False)
+        except as err:
+            self.commit('http_error=', {status: err.response.status, data: err.response.data})
+
+
+    @vc.action
+    @asyncer
+    def change_password(self, old_new):
+        try:
+            yield http.post(self.CHANGE_PASSWORD, old_new)
+        except as err:
+            httperr = Error()
+            httperr.errors = format_err(err.response.data.errors)
+            raise httperr

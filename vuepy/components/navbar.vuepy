@@ -1,0 +1,128 @@
+v-def templ:
+    def T(%tag = 'template'):
+    nav(class="navbar", :class = "{'is-fixed-top': fixed_top}"):
+        div(class = 'container'):
+            div(class = 'navbar-brand'):
+                slot(name = 'brand'):
+                a(class="navbar-burger burger", @click = 'is_active = !is_active'):
+                    span(v-for = 'i in 3', aria-hidden="true"):
+
+            div(class="navbar-menu", :class = "{'is-active':is_active}", @click = 'is_active = false'):
+                T(v-for = "side in ['left', 'right']"):
+                    div(:class="'navbar-' + (side == 'left' ? 'start' : 'end')"):
+                        T(v-for="item in menus[side]"):
+                            T(v-if = "item.slot"):
+                                slot(:name = 'item.slot', :side = 'side'):
+                            T(v-else-if = 'item.subitems && item.subitems.length'):
+                                div(class = "navbar-item has-dropdown is-hoverable"):
+                                    a(class ="navbar-link"): '{{item.label}}'
+                                    div(class = "navbar-dropdown"):
+                                        template(v-for = "subitem in item.subitems"):
+                                            XNavbarItem(
+                                                :href = "subitem.href",
+                                                v-on = "subitem.on",
+                                                v-bind ="subitem.attrs",
+                                            ): '{{subitem.label}}'
+                            T(v-else):
+                                XNavbarItem(:href = "item.href", v-on = "item.on", v-bind ="item.attrs"):  '{{item.label}}'
+
+        slot(name='progress'):
+
+v-pyj:
+@{
+
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import timeout
+
+vc = V_collector()
+
+@vc.component()
+class XNavbarItem(RS_vue):
+    def __init__(self):
+        self.props = {
+            href: String,
+            dropdown: Boolean,
+            arrowless: False,
+            side: String,
+        }
+
+    def link(self, h):
+        nativeOn = None
+
+        def click(e):
+            self.$emit('click', e)
+            # need to hide dropdown
+            @timeout(0)
+            def():
+                e.target.blur()
+
+        href = self.href
+        to_router_link = href and href.startsWith('to:') ?  href[3:] : None
+        if to_router_link:
+            tag = 'router-link'
+            attrs = {'to': to_router_link}
+            nativeOn = { click }
+        else:
+            tag = 'a'
+            attrs = {'href': href or None}
+            on = { click }
+
+        return h(
+            tag, { 'class': 'navbar-item', attrs , on, nativeOn},
+            self.$slots.label or self.$slots.default
+        )
+
+    def dropdown_link(self, h):
+        class_ = {
+            "navbar-link": True,
+            'is-arrowless': self.arrowless
+        }
+        return h('a', {'class':class_}, self.$scopedSlots.label() )
+
+    def dropdown_body(self, h):
+        dropdown_data = {
+            'class': {
+                "navbar-dropdown": True,
+                'is-right': self.side == 'right',
+            }
+        }
+        # [ "navbar-link", "navbar-dropdown"]
+        ret = [
+            self.dropdown_link(h),
+            h('div', dropdown_data, self.$scopedSlots.default() )
+        ]
+        return ret
+
+    def render(self, h):
+        if self.dropdown:
+            return h(
+                'div', { 'class': "navbar-item has-dropdown is-hoverable"},
+                self.dropdown_body(h)
+            )
+        else:
+            return self.link(h)
+
+
+
+@vc.component()
+class XNavbar(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.props = {
+            fixed_top: Boolean,
+            menus: Object
+        }
+    def data(self):
+        return {
+            is_active:False
+        }
+
+
+    def beforeMount(self):
+        if self.fixed_top:
+            document.body.style.paddingTop = '50px'
+
+def make():
+    return [XNavbar(), XNavbarItem()]
+
+}@

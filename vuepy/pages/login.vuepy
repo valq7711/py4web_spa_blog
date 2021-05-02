@@ -1,0 +1,50 @@
+v-def templ:
+    div:
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+
+vc = V_collector()
+
+@vc.component()
+class Login(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            try_connect: '/auth.try_connect*',
+            logged:  '/auth.logged',
+        }
+
+    @asyncer
+    def do_login(self):
+        next = self.$route.query.next
+
+        if self.logged is None:
+            self.$x.busy(True)
+            yield self.try_connect()
+            self.$x.busy(False)
+
+        if not self.logged:
+            ret = (yield self.$x.modal('XLogin'))
+            if ret == 'nav':
+                return
+        if next:
+            self.$router.replace(next)
+        elif self.$route.name == 'login':
+            self.$router.replace('/index')
+
+    def mounted(self):
+        self.do_login()
+
+
+
+
+def make():
+    return{
+        name: 'login',
+        path:'/login',
+        component: Login()
+    }
+}@

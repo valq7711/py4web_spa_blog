@@ -1,0 +1,196 @@
+@font-face { font-family: Roboto;
+            src: url(../fonts/Roboto-Medium.ttf) format('truetype');
+            font-weight: 500;
+}
+@font-face { font-family: Roboto;
+            src: url(../fonts/Roboto-Regular.ttf) format('truetype');
+            font-weight: normal;
+}
+@font-face { font-family: Roboto;
+            src: url(../fonts/Roboto-Bold.ttf) format('truetype');
+            font-weight: bold;
+}
+@font-face { font-family: 'Roboto mono';
+            src: url(../fonts/RobotoMono-Medium.ttf) format('truetype');
+            font-weight: 500;
+}
+@font-face { font-family: 'Roboto mono';
+            src: url(../fonts/RobotoMono-Regular.ttf) format('truetype');
+            font-weight: normal;
+}
+@font-face { font-family: 'Roboto mono';
+            src: url(../fonts/RobotoMono-Bold.ttf) format('truetype');
+            font-weight: bold;
+}
+
+
+.button{ font-weight: 500; letter-spacing:0.5; }
+
+.button.has-text-left { justify-content: flex-start; }
+
+.button.has-text-right { justify-content: flex-end; }
+
+.is-grouped-inline>*:not(:last-child){ margin-right:0.5rem; }
+
+.level.has-shadow, .tabs.active-has-shadow li.is-active{
+    box-shadow: 0 5px 5px lightgray;
+}
+
+.level.has-shadow{ margin-bottom: 5px; }
+
+.tabs .icon:last-child{ width:1em; }
+
+form{ margin-bottom: 0px; }
+
+
+
+/* --------------- [ helpers ]------------------ */
+.nowrap {white-space:nowrap; overflow-x:hidden; text-overflow: ellipsis;}
+
+.r-6{ border-radius: 6px; }
+
+.rt-6{
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+.rb-6{
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+
+/* --------------- [ progress ]------------------ */
+.xprogress-container{
+    width:100%;
+    height: 5px;
+    background: linear-gradient(gray 0%, lightgray 30%, white 100%);
+    position: absolute;
+    top: 2.75rem;
+}
+.xprogress{
+    width:100%;
+    height: 100%;
+    background-color: #005aff;
+    padding: 1px;
+    box-shadow: lightgray 0px 2px 2px;
+}
+.xprogress>div{
+    height:100%;
+    background-color: #ffe000;
+    transition: width cubic-bezier(0, 0, 0.1, 0.97) 10s;
+    width:10%;
+}
+
+
+/* --------------- [ columns gap ]------------------------- */
+.columns.gap-2>.column{
+    padding: 0.5rem;
+}
+.columns.gap-1>.column{
+    padding: 0.25rem;
+}
+
+/* --------------- [ border ]------------------------- */
+.has-border{
+    border: solid 1px lightgrey;
+    border-radius: 0.5rem;
+}
+
+.has-border-left{
+    border-left: solid 3px lightgrey;
+}
+
+/* --------------- [ - ]------------------------- */
+
+.busy{
+    position: fixed;
+    top:0;
+    bottom:0;
+    left:0;
+    right:0;
+    user-select: none;
+    z-index: 50;
+}
+.busy:before{
+  content:" ";
+  position:absolute;
+  /*z-index:9999;*/
+  top:0;
+  bottom:0;
+  left:0;
+  right:0;
+  background-color:rgba(0,0,0,0.8);
+  transition:opacity 500ms;
+  opacity:0;
+}
+.busy-active:before{
+  opacity:0.5;
+}
+.busy:after{
+  font: normal normal 900 36px/0.5 "Font Awesome 5 Free";
+  color:white;
+  content:"\f2f1";
+  position:absolute;
+  /*z-index:9999;*/
+  width:100%;
+  text-align:center;
+  top:50%;
+  animation: a 2s infinite linear;
+}
+
+.flash-container{
+    z-index:100;
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+}
+
+.flash-tr{
+    position:absolute;
+    top: 70px;
+    right: 100px;
+    box-shadow: 0px 5px 10px  gray;
+    min-width: 200px;
+}
+
+
+
+.metalic-btn{
+    background: linear-gradient(180deg, white 50%, #dedede 60%, white 100%);
+    text-shadow: 1px 1px 0px white;
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.metalic-btn:hover{
+    background: linear-gradient(180deg, white 40%, #bebebe 50%, white 100%);
+}
+
+
+.bordered{
+    border: solid 1px lightgray;
+}
+
+
+
+/*--------------[anime] ---------------------*/
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.7s;
+}
+.fade-enter, .fade-leave-to  {
+  opacity: 0;
+}
+
+.trn-enter-active, .trn-leave-active {
+   transition: all 0.5s;
+}
+.trn-enter {
+  transform: translateX(500px);
+}
+
+.trn-leave-to  {
+  /*transform:  scale(0.1);*/
+}
+

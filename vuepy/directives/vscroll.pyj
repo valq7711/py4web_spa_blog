@@ -1,0 +1,74 @@
+def make():
+    opt = {
+        scroll_snap: None,
+        listener: None,
+        container: None,
+        height: None,
+        win: None,
+    }
+
+    def cb(cmd, *args):
+        win =  opt.win
+        container = opt.container()
+        container_rect =  container.getBoundingClientRect()
+        if cmd is 'scrollto':
+            container.children[args[0]].scrollIntoView()
+        elif cmd is 'snap':
+            opt.height = container_rect.height
+            opt.scroll_snap = win.scrollTop
+        elif cmd is 'range':
+            win = opt.win
+            container = opt.container()
+            return get_visible_range(win, container.children)
+        else:
+            #win.scrollTop -= (opt.height - container_rect.height)
+            win.scrollTop = opt.scroll_snap - (opt.height - container_rect.height)
+
+    def get_visible_range(win, items):
+        win_rect =  win.getBoundingClientRect()
+        win_top = win_rect.top
+        win_bottom = win_rect.bottom
+        ret = [0,-1]
+        up = 0
+        dn = items.length - 1
+        # get top visible
+        while dn-up >= 2:
+            cur_idx = (up+dn)/2>>0
+            is_visible = items[cur_idx].getBoundingClientRect().bottom > win_top
+            if  is_visible:
+                dn = cur_idx
+            else:
+                up = cur_idx
+        ret[0] = is_visible ? dn - 1 : up
+        # get bottom visible
+        while (el = items[cur_idx]):
+            is_visible = el.getBoundingClientRect().top < win_bottom
+            if not is_visible:
+                break
+            cur_idx += 1
+        ret[1] = el ? cur_idx : -1
+        return ret
+
+    def handler(e):
+        win = opt.win = e.target
+        container = opt.container()
+        opt.listener(get_visible_range(win, container.children), cb)
+
+
+    directive = {
+        def bind(self, el, binding, vnode):
+            listener = binding.value.listener
+            container = binding.value.container
+            opt.win = el
+            opt.listener = def(*args): return vnode.context[listener](*args);
+            opt.container = container \
+                ? def(): return vnode.context[container](); \
+                : def(): return opt.win.children[0];
+            el.addEventListener('scroll', handler)
+        def inserted(self, el, binding, vnode):
+            vnode.context[binding.value.cmd] = cb
+        def unbind(self, el):
+            el.removeEventListener('scroll', handler)
+    }
+    return directive
+

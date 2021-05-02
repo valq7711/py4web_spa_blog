@@ -1,0 +1,114 @@
+async import settings
+import common
+from common import http
+from asset.rs_vue import V_collector
+from asset.store33 import RS_store
+from asset.utils import asyncer
+import server
+import .auth, .post
+#import app_menu
+#async import axios
+#async import Vue
+
+Vue.use(RS_store)
+
+vc = V_collector()
+@vc.store()
+class Root:
+
+    def _mounted(self):
+        pass
+
+    def init_state(self):
+        ret = {
+            flash: {msg:'Hi', status:'', component: None, cargs: None, trigger:0},
+            is_busy: True,
+            relogin_required: False
+        }
+        return ret
+
+    def __init__(self):
+        self.modules = {auth, post}
+        self._after_relogin = None
+
+        #----------- provide ----------
+        self.provide = {
+            $flash: self.$flash.bind(self),
+            $toggle_busy: self.$toggle_busy.bind(self),
+            $URL: common.URL,
+            get $router(_): return self.$router;,
+            get $route(_): return self.$route;,
+        }
+
+        http.on_status(440)(self.on_440.bind(self))
+
+    def on_440(self, err, opt):
+        return self.commit('relogin_required', True, opt)
+
+    get $router(self):
+        return common.router
+
+    get $route(self):
+        return common.router.$route
+
+
+    @vc.mutation
+    def relogin_required(self, value, request_opt):
+        if value in [False, 'cancel']:
+            self.state.relogin_required = False
+            self._after_relogin(value)
+            return
+        elif self._after_relogin:
+            raise Error('unexpected logic')
+        ok_err = {}
+        p = Promise(def(ok, err):
+            ok_err.ok = ok
+            ok_err.err = err
+        )
+        def after_relogin(type):
+            self._after_relogin = None
+            if type == 'cancel':
+                ok_err.err('cancel')
+                return
+            http[request_opt.meth](
+                request_opt.path,
+                request_opt.args,
+                request_opt.query,
+                request_opt.data,
+                request_opt.conf
+            ).then( ok_err.ok, ok_err.err)
+        self._after_relogin = after_relogin
+        self.state.relogin_required = True
+        self.commit('/auth.logged=', False)
+        return p
+
+    @vc.mutation
+    def toggle_busy(self, onoff):
+        onoff = onoff is undefined ? !self.state.is_busy: onoff
+        self.state.is_busy = onoff
+
+    @vc.mutation
+    def flash(self, msg, status):
+        st_flash = self.state.flash
+        if type(msg) is 'String':
+            st_flash.msg = msg
+            st_flash.component = None
+            st_flash.cargs = None
+        else:
+            st_flash.component = msg.component
+            st_flash.cargs = msg.cargs
+            st_flash.msg = None
+        st_flash.status = status
+        st_flash.trigger += 1
+
+    # shortcuts
+    def $flash(self, *args):
+        return self.commit('flash', *args)
+
+    def $toggle_busy(self, onoff):
+        self.commit('toggle_busy', onoff)
+
+
+def make():
+    return RS_store.root(Root())
+

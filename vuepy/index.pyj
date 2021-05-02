@@ -1,0 +1,9 @@
+# index.js
+from asset import mechanic
+params = document.getElementsByTagName('meta')[0].dataset
+# !convert to object
+params = Object.assign({}, params)
+mechanic.module_spec('settings').exports = params
+import app
+app.start()
+

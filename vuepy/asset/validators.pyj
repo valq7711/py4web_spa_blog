@@ -1,0 +1,96 @@
+def make_template(templ):
+    return new Function('f', "return `"+templ+"`;")
+
+class ValidationError(Error):
+    pass
+
+
+default_messages = {
+    required: 'Enter ${f.label}',
+    min_length: '${f.label} length should not be less than  ${f.minl}',
+    length: '${f.label} length should be between ${f.minl} and ${f.maxl}',
+    regex: "it doesn't look like ${f.label}",
+    filter: "it doesn't look like ${f.label}",
+}
+
+class BaseValidator:
+    def __init__(self, opt):
+        self.sense_from = opt.sense_from or 0
+        self.required = opt.required
+        self.length = opt.length  # Array [min, max]
+        self.regex = opt.regex
+        self.filter = opt.filter
+        _messages = Object.assign({}, default_messages, opt.messages or {})
+        messages = {}
+        for k in _messages:
+            messages[k] = make_template(_messages[k])
+        self.messages = messages
+
+        self.call = self.validate.bind(self)
+
+    def _validate(self, v, opt):
+        msg = self.messages
+        vlen = v.length or 0
+        if self.sense_from > vlen:
+            return
+        if not v:
+            if self.required:
+                return [None, msg['required'](opt)]
+            else:
+                return
+        if self.length:
+            minl, maxl = self.length
+            if not maxl:
+                if not (minl<=vlen):
+                    return [None, msg['min_length']( Object.assign({}, opt, {minl}))]
+            else:
+                if not (minl<=vlen<=maxl):
+                    return [None, msg['length']( Object.assign({}, opt, {minl, maxl}))]
+        if self.regex and not self.regex.test(v):
+            return [None, msg['regex'](opt)]
+
+        if self.filter:
+            try:
+                v = self.filter(v)
+            except ValidationError as err:
+                return [None, err.message or msg['filter'](opt) or '']
+        return [v, None]
+
+    def validate(self, v, opt):
+        return self._validate(v, opt)
+
+
+def string(length, opt):
+    def_opt = {
+        required: True,
+        length: length
+    }
+    opt = Object.assign({}, def_opt, opt)
+    return BaseValidator(opt).call
+
+def email(opt):
+    def_opt = {
+        required: True,
+        regex: /^.+@[^@]+?\.\w+$/
+    }
+    opt = Object.assign({}, def_opt, opt)
+    return BaseValidator(opt).call
+
+def password(opt):
+    def_opt = {
+        required: True,
+        length: [8, 32]
+    }
+    opt = Object.assign({}, def_opt, opt)
+    return BaseValidator(opt).call
+
+def number(opt):
+    def_opt = {
+        required: True,
+        regex: /^\d+((,|\.)\d*)?$/,
+        filter: def(v):
+            return Number(v.replace(',', '.'))
+    }
+    opt = Object.assign({}, def_opt, opt)
+    return BaseValidator(opt).call
+

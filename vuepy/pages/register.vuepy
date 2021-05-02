@@ -1,0 +1,62 @@
+v-def templ:
+    div(class = 'container'):
+        div(class = 'columns'):
+            div(class = 'column is-3 p-0'):
+            div(class = 'column'):
+                h1(class = 'title'): 'Sign Up'
+                hr:
+                div(class = 'box'):
+                    XForm(
+                        :fields = 'fields',
+                        @action = 'on_action',
+                        :validation = 'validation'
+                    ):
+            div(class = 'column is-3  p-0'):
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+from models import register
+
+vc = V_collector()
+
+@vc.component()
+class Pg(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            'register': '/auth.register*',
+            'flash':'flash~'
+        }
+
+    def on_action(self, act_obj, form_values):
+        @self.$x.with_progress
+        @asyncer
+        def register():
+            try:
+                yield self.register(form_values)
+                self.validation = None
+                self.flash('Done!', 'ok')
+                self.$router.push('/login')
+
+            except as err:
+                if err.errors:
+                    self.validation = err.errors
+                else:
+                    raise err
+
+    def data(self):
+        window.frm = self
+        return { fields:register, validation:None }
+
+def make():
+    return{
+        path:'/register',
+        name: 'register',
+        component: Pg(),
+        meta:{
+            requires_login: False
+        }
+    }
+}@

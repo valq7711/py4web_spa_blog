@@ -1,0 +1,60 @@
+v-def templ:
+    div(class = 'container'):
+        div(class = 'columns'):
+            div(class = 'column is-2 p-0'):
+            div(class = 'column'):
+                h1(class = 'title'): 'New Post'
+                hr:
+                XPost(
+                    mode = 'edit',
+                    v-bind = 'post',
+                    @saved = "$router.push({name: 'post_list'})"
+                ):
+            div(class = 'column is-2  p-0'):
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+from common import URL
+
+vc = V_collector()
+
+@vc.component()
+class Pg(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            profile:'/auth.profile',
+            profile_get:'/auth.profile_get*',
+
+        }
+    def data(self):
+        return {
+            post_:{
+                id:'#',
+                title: '',
+                content: '',
+            }
+        }
+
+    @vc.computed
+    def post(self):
+        ret = v'{...self.post_}'
+        ret.author_icon = self.profile ? self.profile.image : ''
+        return  ret
+
+    def created(self):
+        if not self.profile:
+            self.profile_get()
+
+def make():
+    return{
+        path:'/post/new',
+        name: 'post_new',
+        component: Pg(),
+        meta:{
+            requires_login: True
+        }
+    }
+}@

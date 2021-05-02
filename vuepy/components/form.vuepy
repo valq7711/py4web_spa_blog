@@ -1,0 +1,366 @@
+v-def templ_field:
+    div(class = "field"):
+        template(v-if = "check_radio"):
+            div(v-for = 'it in check_radio.fields',
+                class = 'field',
+                :key = 'it.name',
+            ):
+                div(class = 'control'):
+                    label(v-for = 'it in check_radio.labels(it)', class = 'is-capitalized', :class = 'input_type'):
+                        input(
+                                :type = 'input_type',
+                                :name = 'it.name',
+                                v-model = 'input_value',
+                                :value = 'it.value !== undefined ? it.value : it.name',
+                                @change = "on_edit('change')",
+                        ):
+                        slot(v-if = "[undefined, null].includes(it.label) || it.label", :name = "`${it.name}_label`"):
+                            '{{it.label || it.name}}'
+        template(v-else):
+            slot(v-if = "input_label", :name = "`${name}_label`"):
+                label(class = 'label is-capitalized'): '{{input_label}}'
+            div(class = 'control', :class= "{'has-icons-left': icon_left, 'has-icons-right': icon_right}"):
+                template(v-if = "input_type.startsWith('file')"):
+                    template(v-if = "input_type === 'file.img'"):
+                        figure(class = 'image is-128x128 is-inline-block', @click = 'select_file'):
+                            img(:src = "file_url"):
+                        span:
+                            button(class = 'delete', @click = 'clear_file'):
+                        div(style = 'display:none;'):
+                            input(type="file", :name="name", @change = 'change_input_file', ref = 'file'):
+                    template(v-else):
+                        div(class="file has-name"):
+                            label(class="file-label"):
+                                input(class="file-input", type="file", :name="name",  @change = 'change_input_file', ref = 'file'):
+                                span(class="file-cta"):
+                                    span(class="file-icon"):
+                                        i(class="fas fa-upload"):
+                                    span(class="file-label"): 'Choose a file'
+                                span(class="file-name"): '{{filename}}'
+                template(v-else-if = "input_type === 'select'"):
+                    div(class = 'select'):
+                        select(
+                            v-model = 'input_value',
+                            @input = "on_edit('input')",
+                            @change = "on_edit('change')",
+                        ):
+                            option(
+                                v-for = 'opt in options',
+                                :value = 'opt.value !== undefined ? opt.value : opt.name',
+                            ):
+                                '{{option_label(opt)}}'
+                template(v-else):
+                    template(v-if = "input_type === 'textarea'"):
+                        textarea(
+                            class = 'textarea', :class = "input_status",
+                            :placeholder = 'placeholder',
+                            v-model = 'input_value',
+                            @input = "on_edit('input')",
+                            @change = "on_edit('change')",
+                        ):
+                    template(v-else):
+                        input(
+                            :name = 'name',
+                            class = 'input', :class = "input_status",
+                            :type = 'input_type',
+                            :placeholder = 'placeholder',
+                            v-model = 'input_value',
+                            @input = "on_edit('input')",
+                            @change = "on_edit('change')",
+                        ):
+                        template(v-for = "icon in [[icon_left, 'is-left'], [icon_right, 'is-right']]"):
+                            span(v-if = "icon[0]", class="icon is-small" , :class = "icon[1]"):
+                                i(:class="'fas fa-' + icon[0]"):
+                        #p(class = "help", :class= "input_status"):
+                    p(v-if = 'help_message', class = "help", :class= "input_status"):
+                        "{{help_message}}"
+
+
+v-def templ_form:
+    div:
+        form(method = 'post', autocomplete = "off", @submit.prevent.stop):
+            XField(v-for = 'it in fields_c',
+                :key ='it.name',
+                :ref = 'it.name',
+                v-bind = 'it',
+                @change = "$emit('change',it)"
+            ):
+            slot(name = 'actions'):
+                div(class = 'field is-grouped'):
+                    div(v-for = "act in actions", class = 'control'):
+                        button(class = 'button is-primary', @click.stop.prevent = 'action(act)'): '{{act.label || act.name}}'
+
+v-pyj:
+@{
+from asset.rs_vue import V_collector,  RS_vue
+from asset.utils import read_img_url
+
+MAP_STATUS = {
+    'ok':'is-success',
+    'error':'is-danger',
+    'warning':'is-warning',
+}
+
+vc = V_collector()
+@vc.component()
+class XField(RS_vue):
+    def __init__(self):
+        self.template = templ_field
+        self.props = {
+            name: String,
+            value: [String, Object, Array, Boolean],
+            default_file_url: String,
+            label: String,
+            status: {
+                validator: def(v):
+                    return ['ok', 'error', 'warning'].includes(v)
+            },
+            message: String,
+            type: {type: String, default:'text'},
+            icon_left:String,
+            icon_right:String,
+            placeholder:String,
+            validator: {type: [Object, Function]},
+            validation: Object,
+            options:Array,
+        }
+
+    def data(self):
+        return {
+            input_value: self.value or '',
+            input_file_url: None,
+            input_file: None,
+            dirty: None,
+            validation$: {
+                status: None, # ok | err | None
+                message: None,
+                value: None
+            }
+        }
+
+
+    @vc.computed
+    def filename(self):
+        if type(self.input_value) != 'String':
+            name = self.input_value[0].name
+            return name
+        return self.input_value or ''
+
+    @vc.computed
+    def file_url(self):
+        inp = self.input_value
+        if inp and inp == ':delete' or type(inp) != 'String':
+            inp = ''
+        return self.input_file_url or inp or self.default_file_url or ''
+
+    def select_file(self):
+        self.$refs.file.click()
+
+    def clear_file(self):
+        self.input_file = ''
+        self.input_value = ':delete'
+
+    def change_input_file(self):
+        if (files = self.$refs.file.files) and files.length:
+            self.input_value = files
+            self.input_file = files
+        else:
+            self.input_value = self.input_file  # ''
+
+    @vc.watch
+    def input_value(self, n, o):
+        self.dirty = True
+        if self.type.startsWith('file'):
+            read_url = self.type == 'file.img'
+            self.set_file_input(read_url)
+
+    def set_file_input(self, read_url):
+        #self.input_value = self.$refs.file.files
+        #name = (it = self.input_value[0]) ? it.name : ''
+        if read_url and self.input_value and type(self.input_value) != 'String':
+            @read_img_url(self.input_value).then
+            def(url):
+                self.input_file_url = url
+        else:
+            self.input_file_url = ''
+
+    @vc.watch
+    def validation(self, n, o):
+        Object.assign(self.validation$, n)
+
+    @vc.computed
+    def input_status(self):
+        status = self.status or self.validation$.status
+        return status ? MAP_STATUS[status] : None
+
+    @vc.computed
+    def help_message(self):
+        return  self.message or self.validation$.message
+
+    @vc.computed
+    def check_radio(self):
+        if self.input_type == 'checkbox':
+            fields = self.options or [{name:self.name, label:self.input_label, value:self.value}]
+            labels = def(it): return [it];
+        elif self.input_type == 'radio':
+            fields = [self.name]
+            _labels = self.options or [{name:self.name, label:self.input_label, value:self.value}]
+            labels = def(): return _labels;
+        else:
+            return None
+        return {fields, labels}
+
+    @vc.computed
+    def validation_status(self):
+        return self.validation$.status
+
+    @vc.computed
+    def has_error(self):
+        self.validate()
+        return self.validation_status == 'error'
+
+    @vc.computed
+    def input_label(self):
+        ret = self.label not in [undefined, None] ? self.label : self.name
+        ret = ret.replace(/_/g, ' ')
+        return ret
+
+    @vc.computed
+    def input_type(self):
+        return self.type
+
+    @vc.watch
+    def value(self, n, o):
+        self.input_value = n
+
+    def option_label(self, opt):
+        return opt.label is not undefined \
+                ? opt.label \
+                : opt.value is not undefined \
+                    ? opt.value \
+                    : opt.name is not undefined \
+                        ? opt.name \
+                        : opt
+
+    def on_edit(self, e):
+        self.reset_validation()
+        self.$emit(e, self.input_value)
+        self.validate(e)
+
+    def reset_validation(self):
+        Object.assign(self.validation$, {value:None, message:None, status:None})
+
+    def validate(self, e):
+        validation = self.validation$
+        if self.dirty is False:
+            return validation.value, validation.message
+
+        if (validator = self.validator):
+            if e:
+                _validator = validator['on_'+e]
+            else:
+                _validator = validator['on_submit'] or validator.call and validator
+
+            if type(_validator) == 'String':
+                validator = validator[_validator]
+                if not validator:
+                    raise KeyError(f'there is not ${_validator}-validator')
+            else:
+                validator = _validator
+
+        if not validator:
+            return
+
+        out_value, message, status = (validator(self.input_value, {on: e, name: self.name, label: self.input_label}) or [None, None, None])
+        if not status:
+            status = out_value is not None ?  'ok' : message is not None ? 'error' : None
+        validation.value = out_value
+        validation.message = message
+        validation.status = status
+        self.dirty = False
+        return out_value, message
+
+
+@vc.component()
+class XForm(RS_vue):
+    def __init__(self):
+        self.template = templ_form
+        def default_actions():
+            return [{
+                name:'OK',
+                label:'OK',
+                if_valid: True
+            }]
+
+        self.props = {
+            fields:Array,
+            record: Object,
+            actions:{type: Array, default: default_actions},
+            validator: {type: [Object, Function], default: None},
+            validation: Object  # {field_name: {message: String, status?: in ['ok','error','warning']} }
+        }
+    def data(self):
+        return {
+            _errors: None
+        }
+
+    @vc.computed
+    def fields_c(self):
+        validation = self.validation
+        if not (validation or self.record):
+            return self.fields
+
+        rec = self.record or {}
+        validation = validation or {}
+        @self.fields.map
+        def mapped(it):
+            clone = Object.assign({}, it)
+            if (v = validation[it.name]):
+                clone.validation = v
+            if (v = rec[it.name]) != undefined:
+                clone.value = v
+            return clone
+        return mapped
+
+
+    def validate(self):
+        errors = []
+        values = {}
+        for f in self.fields:
+            xfld = self.$refs[f.name][0]
+            if xfld.has_error:
+                errors.push({
+                    field: f,
+                    value: xfld.input_value,
+                    message: xfld.help_message
+                })
+            else:
+                values[f.name] = xfld.input_value
+
+        if not errors.length:
+            errors = None
+            if self.validator:
+                values, errors = self.validator(values)
+        self._errors = errors
+        if not errors:
+            return values
+
+    @vc.computed
+    def errors(self):
+        self.validate()
+        return self._errors
+
+    def action(self, act):
+        print(act.name)
+        values = None
+        if act.if_valid:
+            values = self.validate()
+            if not values:
+                return
+        self.$emit('action', act, values)
+        self.$emit('action:' + act.name, act, values)
+
+def make():
+    return [XField(), XForm()]
+
+}@

@@ -1,0 +1,89 @@
+from asset.rs_vue import V_collector
+from asset.store33 import RS_store
+from asset.utils import asyncer, upload, download_link
+vc = V_collector()
+from common import http
+import common
+from models import default_author_icon
+
+dtformatter = def(d):
+    if type(d) == 'Number':
+        d *= 1000
+    return d ? (new Date(d)).toLocaleString() : ''
+
+@vc.store()
+class Store:
+
+    def _mounted(self):
+        pass
+
+    def __init__(self):
+        self.API_POST = 'api_blog/post'
+
+    def init_state(self):
+        ret = {
+            post_list: None,
+            post: {}
+        }
+        return ret
+
+    @vc.mutation
+    def post_list_set(self, lst):
+        st = self.state
+        post = {}
+        post_list = []
+        @lst.map
+        def(it):
+            post[it.id] = it
+            post_list.push(it.id)
+        st.post = post
+        st.post_list = post_list
+
+    @vc.action
+    @asyncer
+    def post_get(self, user_id):
+        user_args = []
+        if user_id:
+            user_args = ['user', user_id]
+        post_list = (yield http.get(self.API_POST, user_args)).data.items
+        self.commit('post_list_set', post_list)
+
+    @vc.action
+    @asyncer
+    def post_save(self, pid, payload):
+        meth = pid == '#' ? 'post' : 'put'
+        pid = pid == '#' ? '' : pid
+        try:
+            ret = (yield http[meth](f'${self.API_POST}/${pid}', payload)).data.items[0]
+        except as err:
+            errors = err.response.data.errors
+            httperr = Error()
+            httperr.errors = {}
+            for f in errors:
+                httperr.errors[f] = {
+                    status:'error',
+                    message: errors[f]
+                }
+            raise httperr
+        self.$set(self.state.post, ret.id, ret)
+
+    @vc.action
+    @asyncer
+    def post_del(self, pid):
+        try:
+            yield http.delete(f'${self.API_POST}/${pid}')
+        except as err:
+            raise err
+
+    @vc.getter
+    def post_list(self, st):
+        out = []
+        for pid in (st.post_list or []):
+            rec = v'{...st.post[pid]}'
+            rec.date_posted =dtformatter(rec.date_posted)
+            rec.author_id = rec.author
+            rec.author = rec.username
+            rec.author_icon = common.URL('static/images/', rec.author_icon or default_author_icon)
+            out.push(rec)
+        return out
+

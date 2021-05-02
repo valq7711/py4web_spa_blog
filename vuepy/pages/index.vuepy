@@ -1,0 +1,76 @@
+v-def templ:
+    div(class = 'container'):
+        div(class = 'columns'):
+            div(class = 'column is-2 p-0'):
+            div(class = 'column'):
+                h1(class = 'title'): 'Posts'
+                hr:
+                template(v-if = 'is_ready'):
+                    p(v-if = "!(post_list && post_list.length)"):
+                        "There doesn't seem to be any posts made yet. Why don't you "
+                        span(class = 'tag is-large'):
+                            router-link(to = '/register'):'sign up'
+                        "and make one?"
+                    XPost(
+                        v-for = "p in post_list",
+                        mode = 'show',
+                        v-bind = 'p',
+                        :key = 'p.id'
+                    ):
+                template(v-else):
+                    div:
+                        'Loading...'
+            div(class = 'column is-2  p-0'):
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+from common import URL
+
+vc = V_collector()
+
+@vc.component()
+class Pg(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            'post_get': '/post.post_get*',
+            'post_list': '/post.post_list',
+        }
+        self.props = {
+            user_id: Number
+        }
+
+    def data(self):
+        return {is_ready: False}
+
+    def load_post(self):
+        @self.$x.with_progress
+        @asyncer
+        def():
+            self.is_ready = False
+            yield self.post_get(self.user_id)
+            self.is_ready = True
+
+    @vc.watch
+    def user_id(self, n, o):
+        self.load_post()
+
+    def created(self):
+        self.load_post()
+
+
+def make():
+    return{
+        path:'/post/:user_id(\\d+)?',
+        alias: '/index/:user_id(\\d+)?',
+        name: 'post_list',
+        props: def(r):
+            return {user_id: parseInt(r.params.user_id)}
+        component: Pg(),
+        meta:{
+            requires_login: False
+        }
+    }
+}@

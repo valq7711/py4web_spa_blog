@@ -1,0 +1,85 @@
+v-def templ:
+    div(class = 'container'):
+        div(class = 'columns'):
+            div(class = 'column is-3 p-0'):
+            div(class = 'column'):
+                h1(class = 'title'): 'Profile'
+                hr:
+                div(class = 'box'):
+                    XForm(
+                        v-if = 'profile',
+                        :fields = 'fields',
+                        :record = 'profile',
+                        @action = 'on_action',
+                        :validation = 'validation',
+                    ):
+                    div(v-else): 'Loading...'
+
+            div(class = 'column is-3  p-0'):
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+from asset.utils import asyncer
+from models import profile
+from common import URL
+
+vc = V_collector()
+
+@vc.component()
+class Pg(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.map_store = {
+            'profile_get': '/auth.profile_get*',
+            'profile_set': '/auth.profile_set*',
+            'profile': '/auth.profile',
+            'flash':'flash~'
+        }
+
+    def on_action(self, act_obj, form_values):
+        @self.$x.with_progress
+        @asyncer
+        def register():
+            try:
+                yield self.profile_set(form_values)
+                self.validation = None
+                self.flash('Done!', 'ok')
+            except as err:
+                if err.errors:
+                    self.validation = err.errors
+                else:
+                    raise err
+
+    def data(self):
+        window.frm = self
+        return { model: profile, validation:None }
+
+    @vc.computed
+    def fields(self):
+        if not self.profile:
+            return
+        ret = []
+        for f in self.model:
+            fld = Object.assign({}, f)
+            if fld.type == 'file.img':
+                fld.default_file_url = URL('static/images/', fld.default_file_url)
+            ret.push(fld)
+        return ret
+
+
+    def created(self):
+        if not self.profile:
+            self.profile_get()
+
+
+def make():
+    return{
+        path:'/profile',
+        name: 'profile',
+        component: Pg(),
+        meta:{
+            requires_login: True
+        }
+    }
+}@

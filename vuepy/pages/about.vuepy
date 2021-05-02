@@ -1,0 +1,22 @@
+v-def templ:
+    div(class = 'container'):
+        h1(class= 'title'):'About page'
+
+v-pyj:
+@{
+from asset.rs_vue import RS_vue, V_collector
+
+vc = V_collector()
+
+@vc.component()
+class Pg(RS_vue):
+    def __init__(self):
+        self.template = templ
+
+def make():
+    return{
+        name: 'about',
+        path:'/about',
+        component: Pg()
+    }
+}@

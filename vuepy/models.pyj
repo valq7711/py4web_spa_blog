@@ -1,0 +1,64 @@
+from asset.validators import email, password, string, number
+
+default_author_icon = 'default.jpg'
+
+_profile = [
+    {
+        name: 'username',  label: 'user name',  icon_left: 'user',
+        validator:{
+            on_change: string([2,15]),
+            on_submit: 'on_change'
+        }
+    },
+    { name: 'email', icon_left: 'envelope', validator: email()},
+    { name: 'last_name', validator: string() },
+    { name: 'first_name', validator: string() },
+    {
+        name: 'password', icon_left: 'key',
+        type: 'password',
+        validator: password(),
+    },
+    {
+        name: 'image',
+        label: 'avatar',
+        type: 'file.img',
+        default_file_url: default_author_icon
+    },
+]
+
+
+register = _profile.filter(def(it):
+    return it.name != 'image'
+)
+
+profile = _profile.filter(def(it):
+    return it.name != 'password'
+)
+
+
+post = [
+    {
+        name:'title',
+        validator:{
+            on_change: string([2,64]),
+            on_submit: 'on_change'
+        }
+    },
+    {
+        name:'content',
+        type: 'textarea',
+        validator:{
+            on_change: string([3,1024*5]),
+            on_submit: 'on_change'
+        }
+    }
+]
+
+
+def make_dict(model):
+    return {(f.name):f for f in model}
+
+
+post_fields = make_dict(post)
+auth_fields = make_dict(register)
+

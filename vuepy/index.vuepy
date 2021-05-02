@@ -1,0 +1,37 @@
+def favicon(%tag = 'link',  rel="shortcut icon", type="image/x-icon"):
+
+def CSS:
+    link(rel="stylesheet", type="text/css", href= '[[ =URL("static", "fontawesome/css/all.css")]]'):
+    link(rel="stylesheet", type="text/css", href= '[[ =URL("static", "css/v3p_bulma.css")]]'):
+    link(rel="stylesheet", type="text/css", href= '[[ =URL("static", "css/app.css")]]'):
+
+'<!doctype html>'
+html:
+    head:
+        meta(charset='utf-8',
+             data-app_base = '[[=app_root]]',
+             data-app_static = '[[=URL("static")]]',
+        ):
+        meta(name="viewport", content="width=device-width, initial-scale=1, shrink-to-fit=no"):
+        favicon(href= '[[=URL("static", "logo.png")]]'):
+        CSS:
+        title:
+            '[[= title]]'
+    body:
+        div(id = "app"):
+    script(type = 'text/javascript', src = '[[=URL("static", "js/axios.min.js")]]'):
+    script(type = 'text/javascript', src = '[[=URL("static", "js/vue.js")]]'):
+    script(type = 'text/javascript', src = '[[=URL("static", "js/vue-router.js")]]'):
+    script(type = 'text/javascript', src = '[[=URL("static", "js/index.js")]]'):
+
+v-pyj:
+    # index.js
+    from asset import mechanic
+    params = document.getElementsByTagName('meta')[0].dataset
+    # !convert to object
+    params = Object.assign({}, params)
+    mechanic.module_spec('settings').exports = params
+    import app
+    app.start()
+
+

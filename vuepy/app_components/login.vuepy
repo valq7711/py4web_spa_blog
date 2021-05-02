@@ -1,0 +1,73 @@
+v-def templ_login:
+    XModal(:can_cancel = 'false', max_width = '300px'):
+        template(v-slot:title):
+            'Login'
+        template(v-slot:body):
+            form(ref = 'frm', method = 'post', autocomplete = "off", @submit.prevent.stop):
+                div(v-if = '!username',class = 'field'):
+                    p(class = 'control has-icons-left'):
+                        input(
+                            name = 'username',
+                            class = 'input',
+                            placeholder = 'name',
+                        ):
+                        span(class="icon is-small is-left"):
+                            i(class="fas fa-user"):
+
+                div(class = 'field'):
+                    p(class = 'control has-icons-left'):
+                        input(
+                            name = 'password',
+                            class = 'input',
+                            type = 'password',
+                            placeholder = 'password',
+                            @keydown.enter = "ok"
+                        ):
+                        span(class="icon is-small is-left"):
+                            i(class="fas fa-lock"):
+
+        template(v-slot:footer):
+            div(class = 'container buttons is-right'):
+                button(class = 'button is-primary', :class = "{'is-loading': in_process}", @click.stop.prevent = 'ok'):'OK'
+
+v-pyj:
+@{
+from asset.rs_vue import V_collector,  RS_vue
+from asset.utils import asyncer
+vc = V_collector()
+
+@vc.component()
+class XLogin(RS_vue):
+    def __init__(self):
+        self.template = templ_login
+        self.map_store = {
+            'err' : '/auth.http_error',
+            'login' : '/auth.login*',
+            'logged':'/auth.logged',
+            'flash': 'flash~'
+        }
+        self.props = {
+            username: String
+        }
+    def data(self):
+        return {in_process: False}
+
+    def ok(self):
+        setTimeout(def(): self.async_ok();, 0)
+
+    @asyncer
+    def async_ok(self):
+        frm = new FormData(self.$refs.frm)
+        if self.username:
+            frm.append('username', self.username)
+        self.in_process = True
+        yield self.login(frm)
+        self.in_process = False
+        if self.logged:
+            self.$emit('close')
+        else:
+            self.flash(self.err.data.message, 'error')
+def make():
+    return XLogin()
+
+}@

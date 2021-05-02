@@ -1,0 +1,38 @@
+async import settings
+import common
+
+import directives with click_out, vscroll
+import components with navbar, progress_bar, modal, form, vscroll
+import app_components with top_menu, login, post, change_password
+
+from xtools import XTools
+
+import store
+import routes
+
+def reg_directives(Vue):
+    for dname in directives:
+        d = directives[dname]
+        Vue.directive(d.name or dname, d.make())
+
+def reg_components(Vue):
+    for pack in [components, app_components]:
+        for cname in pack:
+            c = pack[cname]
+            if c.make:
+                c = c.make()
+                if not Array.isArray(c):
+                    c = [c]
+                for c_ in c:
+                    Vue.component(c_.name, c_)
+
+def run(Vue):
+    reg_directives(Vue)
+    reg_components(Vue)
+
+    x = XTools(settings.app_base, settings.app_static)
+    Vue.prototype.$x = x
+
+    common.URL = x.URL
+    common.store = store.make()
+    common.router = routes.make()

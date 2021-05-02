@@ -1,0 +1,42 @@
+async import settings
+import common
+import pages with login, index, register, profile, post_new, about
+Vue.use(VueRouter)
+
+def make_routes():
+    routes = []
+    for p in  pages:
+        pg = pages[p].make()
+        if p == 'index':
+            index = pg
+        routes.push(pg)
+    routes.push({path:'/', index})
+    routes.push({path:'/*', component: {template: '<div>not found</div>'}})
+    return routes
+
+def before_each(to_, _, next):
+    if to_.matched.some(def(record): (record.meta and record.meta.requires_login);):
+        if not common.store.get('/auth.user'):
+            next({
+                path: '/login',
+                query: { next: to_.fullPath },
+            })
+        else:
+          next()
+    else:
+        next()
+
+def after_each(to_, _):
+    if this.app._isMounted:
+        this.app.close_modal()
+
+def make():
+    router = new VueRouter({
+        routes: make_routes(),
+        mode: 'history',
+        base: settings.app_base
+    })
+    router.beforeEach(before_each.bind(router))
+    router.afterEach(after_each.bind(router))
+    return router
+

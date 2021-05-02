@@ -1,0 +1,143 @@
+import  components with flash, modal
+
+class XTools:
+    def __init__(self, app_base, app_static):
+        self.url_static = app_static
+        self.url_base = app_base
+        self._busy_el
+        self._busy_tm_id
+
+        self.flash = components.flash.open
+        self.modal_open = components.modal.open
+        # loading indicator - set by App
+        self.start_progress = None
+        self.end_progress = None
+        self.$root = None
+
+        self.busy_state = {
+            el: None,
+            tm: None
+        }
+
+        self.modal_state = {
+            vm: None,
+            ok_err: None
+        }
+
+        # bindings
+        self.show_busy = self.show_busy.bind(self)
+        self.modal_close = self.modal_close.bind(self)
+        self.URL = self.URL.bind(self)
+
+        # install
+        #Vue.prototype.$x = self
+
+    def on_resize(self, f):
+        off = window.addEventListener('resize', f)
+        return def(): window.removeEventListener('resize', f)
+
+    def modal_close(self, *args):
+        if not self.modal_state.ok_err:
+            return
+        ok = self.modal_state.ok_err.ok
+        vm = self.modal_state.vm
+        if vm:
+            vm.$modal and vm.$modal.close()
+        Object.assign(self.modal_state, {
+            vm: None,
+            ok_err: None
+        })
+        ok(*args)
+
+    def modal(self, component, args, opt):
+        if self.modal_state.ok_err:
+            raise Error('only one active modal is allowed')
+        resolver = def(ok, err):
+            self.modal_state.ok_err = {ok, err}
+        ret = Promise(resolver)
+        if component in ['confirm', 'dialog']:
+            props = Object.assign({type: component},  args)
+            self.modal_open(self.$root, { props }).then(self.modal_close)
+        else:
+            if type(component) is 'String':
+                component = self.$root.constructor.component(component)
+            modal_opt = {
+                props: args,
+                component: component,
+            }
+            if opt:
+                modal_opt.can_cancel = 'cancelable' in opt ? opt.cancelable : True
+            vm = self.modal_state.vm = self.modal_open(self.$root, modal_opt)
+            vm.$on('close', self.modal_close)
+            vm.$on('ok', self.modal_close)
+        ret.close = self.modal_close
+        return ret
+
+
+
+    def URL(self, *args):
+        path = args.join('')
+        if (tmp = /^static(\/.*)/.exec(path)):
+            return self.url_static + tmp[1]
+        if not /^(\w+?:\/)?\//.test(path):
+            return self.url_base + '/' + path
+        return path
+
+    def show_busy(self):
+        busy =  self.busy_state
+        el = document.createElement('div')
+        el.className = 'busy'
+        document.body.appendChild(el)
+        setTimeout(def(): el.className += ' busy-active';, 0)
+        busy.el = el
+        busy.tm = None
+
+    def busy(self, on):
+        busy =  self.busy_state
+        if on:
+            if busy.el or busy.tm:
+                return
+            busy.tm = setTimeout(self.show_busy, 200)
+        else:
+            if busy.tm:
+                clearTimeout(busy.tm)
+                busy.tm = None
+            elif busy.el:
+                document.body.removeChild(busy.el)
+                busy.el = None
+
+    def _with(self, fun, start, end):
+        start()
+        p = fun
+        if not isinstance(p, Promise):
+            try:
+                p = p.call(None)
+            except as err:
+                end()
+                raise err
+            if not isinstance(p, Promise):
+                end()
+                raise Error('promise was expected')
+        p.then(end, end)
+        return p
+
+    def with_progress(self, fun):
+        return self._with(
+            fun,
+            self.start_progress.bind(self),
+            self.end_progress.bind(self)
+        )
+
+    def with_busy(self, fun):
+        return self._with(
+            fun,
+            def(): self.busy(True);,
+            def(): self.busy(False);
+        )
+
+
+
+
+
+
+

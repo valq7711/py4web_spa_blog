@@ -1,0 +1,12 @@
+async import settings
+import server
+
+# declare common objects/utils  - will set by setup.pyj
+store = None
+router = None
+URL = None
+
+http = server.API(
+    axios,
+    settings.app_base
+)

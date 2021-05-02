@@ -1,0 +1,152 @@
+v-def templ:
+    article(class="media"):
+        figure( class="media-left"):
+            p(class="image is-64x64"):
+                img(:src="author_icon"):
+        div(class="media-content"):
+            template(v-if = "mode == 'edit'"):
+                XField(
+                    ref = 'title',
+                    :value = 'title',
+                    v-bind = 'fields.title',
+                    @change = 'post_edit.title = $event'
+                ):
+                XField(
+                    ref = 'content',
+                    :value = 'content',
+                    v-bind = 'fields.content',
+                    @change = 'post_edit.content = $event'
+                ):
+                nav(class="level"):
+                    div(class="level-left"):
+                        div(class="level-item"):
+                            a(
+                                class="button is-primary", :class = "state",
+                                @click = 'save_post'
+                             ):
+                                'OK'
+                        div(class="level-item"):
+                            a(class="button", :class = "state", @click = "cancel"):'Cancel'
+                    div(
+                        v-if = '!is_new_post',
+                        class="level-right"
+                    ):
+                        div(class="level-item"):
+                            a(class="button is-danger",:class ="state", @click = 'del_post'):'Delete'
+            template(v-else):
+                div(class="content"):
+                    p(class = 'title'):'{{title}}'
+                    p():
+                        span:
+                            strong(v-text = 'author'):
+                            small(v-text = 'date_posted'):
+                        span(
+                            v-if = 'user && user.id == author_id',
+                            class="is-pulled-right"
+                        ):
+                            button(class="button", @click="mode= 'edit'" ):
+                                span(class="icon"): i(class="fas fa-edit"):
+                    hr(class = 'my-1'):
+                    p(class = 'ml-4', v-text = 'content'):
+
+v-pyj:
+@{
+from asset.rs_vue import V_collector,  RS_vue
+from asset.utils import asyncer
+from models import post_fields
+vc = V_collector()
+
+@vc.component()
+class XPost(RS_vue):
+    def __init__(self):
+        self.template = templ
+        self.props = {
+            id: [Number, String],
+            content: String,
+            author: String,
+            author_id: [Number, String],
+            author_icon: String,
+            title: String,
+            date_posted: String,
+            #mode: {type: String, default: 'show'}
+
+        }
+        self.map_store ={
+            save_post: '/post.post_save*',
+            del_post: '/post.post_del*',
+            post_get: '/post.post_get*',
+            user: '/auth.user'
+        }
+    def data(self):
+        return {
+            mode: self.id != '#' ? 'show' : 'edit',
+            state: None,
+            post_edit: {
+                content: self.content,
+                title: self.title
+            },
+            errors: None
+        }
+
+    @vc.watch
+    def mode(self, n):
+        if n == 'edit':
+            self.post_edit.content = self.content
+            self.post_edit.title = self.title
+
+    @vc.computed
+    def is_new_post(self):
+        return self.id == '#'
+
+    @vc.computed
+    def fields(self):
+        fields = v'{...post_fields}'
+        for k in (self.errors or []):
+            fields[k].validation = self.errors[k]
+        return fields
+
+    def cancel(self):
+        if self.is_new_post:
+            self.$router.go(-1)  # back
+        else:
+            self.mode= 'show'
+
+
+
+    def save_post(self, act):
+        for it in self.fields:
+            if self.$refs[it].has_error:
+                return
+
+        @self.$x.with_progress
+        @asyncer
+        def():
+            self.state = 'is-loading'
+            try:
+                yield act(self.id, self.post_edit)
+                self.errors = None
+                self.$emit('saved')
+            except as err:
+                if err.errors:
+                    self.errors = err.errors
+                    err = None
+            self.state = None
+            if not self.is_new_post:
+                self.mode = 'show'
+            if err: raise err
+
+    @asyncer
+    def del_post(self, act):
+        ret = yield self.$x.modal('confirm', {message: 'Are you sure?'})
+        if ret == 'ok':
+            @self.$x.with_progress
+            @asyncer
+            def():
+                yield act(self.id)
+                yield self.post_get()
+                self.mode = 'show'
+
+def make():
+    return XPost()
+
+}@

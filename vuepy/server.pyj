@@ -1,0 +1,107 @@
+
+HTTP_METHODS = 'get post put patch delete head'.split(' ')
+
+def inject_http_methods(cls):
+    for m in HTTP_METHODS:
+        v'const meth = m'
+        cls.prototype[meth] = def(*args):
+            return this.http(meth, *args)
+    return cls
+
+@inject_http_methods
+class API:
+    def __init__(self, axios, baseURL):
+        self.baseURL = baseURL
+        self.srv = axios.create({
+              baseURL: baseURL,
+              timeout: 60000,
+            })
+        self.last_resp =''
+        self.last_error =''
+        self._on_satus = {}
+
+
+    def on_status(self, status, replace = False):
+        if not replace and self._on_satus[status]:
+            raise Error(f'"${status}"-handler is already set')
+        def inner(f):
+            self._on_satus[status] = f
+            return f
+        return inner
+
+    def http(self, meth, path, args, query, data, conf):
+        _opt = {meth, args, query, data, conf}
+        opt = {args, query, data, conf}
+        if not Array.isArray(args):
+            # (meth, path, query=args, data=query, conf=data)
+            opt.args = None
+            opt.query = args
+            opt.data = query
+            opt.conf = data
+
+            args = opt.args
+            query = opt.query
+            data = opt.data
+            conf = opt.conf
+
+        if query and query.is_config:
+            opt.conf = query
+            opt.query = None
+            opt.data = None
+
+            query = None
+            data = None
+            conf = opt.conf
+
+        if not conf:
+            if data and data.is_config:
+                opt.conf = data
+                opt.data = None
+                data = None
+                conf = opt.conf
+            if not data and meth in ['post', 'put', 'patch', 'delete']:
+                opt.data = query
+                opt.query = None
+                query = None
+                data = opt.data
+
+        conf = conf or {}
+        if args:
+            args.unshift(path)
+            path = args.join('/')
+        if query:
+            conf.params = query
+        if data:
+            conf.data = data
+
+        Object.assign(conf, {
+            method: meth,
+            url: path,
+        })
+        del conf.is_config
+        #ret =  self.srv[meth]( path, data, conf)
+        ret =  self.srv.request(conf)
+        .then(
+            def(r):
+                self.done(r)
+                return r;
+            , def(r):
+                return self.raise_error(r, _opt);
+        )
+        return ret
+
+    def done(self, resp):
+        self.last_resp = resp
+        status = resp.status
+        if (cb = self._on_satus[status]):
+             cb(resp)
+
+    def raise_error(self, err, opt):
+        self.last_error = err
+        status = err.response.status
+        if (cb = self._on_satus[status]):
+            ret = cb(err, opt)
+            if ret:
+                return ret
+        return Promise.reject(err)
+
